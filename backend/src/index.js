@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import uploadRoutes from "./routes/upload.js";
+import searchRoutes from "./routes/search.js";
+import testQueryRoutes from "./routes/testQuery.js";
 
 dotenv.config();
 const app = express();
@@ -15,6 +17,8 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error("❌ DB connection error:", err));
 
 app.use("/api/upload", uploadRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/test", testQueryRoutes);
 
 app.get("/", (req, res) => {
   res.send("OpsMind AI backend running!");

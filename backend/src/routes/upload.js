@@ -1,36 +1,52 @@
 import express from "express";
 import multer from "multer";
 import { parseAndChunkPDF } from "../services/pdfParser.js";
+import { generateEmbedding } from "../services/embeddings.js";
+import { Chunk } from "../models/chunkModel.js";
 
 const router = express.Router();
 
-// Configure Multer for file storage
+// Multer storage config
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
-// Upload Route
+// Upload endpoint
 router.post("/", upload.single("file"), async (req, res) => {
   try {
     const filePath = req.file.path;
-    console.log("📄 File received:", filePath);
+    console.log("📄 Received file:", filePath);
 
     const chunks = await parseAndChunkPDF(filePath);
+    console.log(`📑 Parsed ${chunks.length} chunks`);
 
-    res.status(200).json({
-      message: "✅ PDF processed successfully",
-      totalChunks: chunks.length,
-      sample: chunks.slice(0, 3),
+    const savedDocs = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const text = chunks[i];
+      const embedding = await generateEmbedding(text);
+
+      const doc = new Chunk({
+        text,
+        embedding,
+        source: req.file.originalname,
+      });
+
+      await doc.save();
+      savedDocs.push(doc);
+
+      console.log(`✅ Stored chunk ${i + 1}/${chunks.length}`);
+    }
+
+    res.json({
+      message: "✅ PDF processed & embeddings stored (local model)",
+      totalChunks: savedDocs.length,
     });
-  } catch (error) {
-    console.error("❌ Error processing PDF:", error);
-    res.status(500).json({ error: "Failed to process PDF" });
+  } catch (err) {
+    console.error("❌ Upload error:", err);
+    res.status(500).json({ error: "Failed to process file" });
   }
 });
 
