@@ -19,7 +19,7 @@ export async function generateEmbedding(text) {
   try {
     const model = await loadModel();
     const output = await model(text, { pooling: "mean", normalize: true });
-    return Array.from(output.data); // Convert tensor -> plain JS array
+    return Array.from(output.data); 
   } catch (err) {
     console.error("❌ Embedding error:", err);
     throw err;
