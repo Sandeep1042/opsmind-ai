@@ -9,10 +9,9 @@ import { generateEmbedding } from "./embeddings.js";
  */
 export async function retrieveRelevantChunks(query, topK = 3) {
   try {
-    // Step 1️⃣: Generate vector embedding for the user's query
+    
     const embedding = await generateEmbedding(query);
 
-    // Step 2️⃣: Perform a vector search in MongoDB Atlas
     const results = await mongoose.connection.db
       .collection("chunks")
       .aggregate([
@@ -28,7 +27,6 @@ export async function retrieveRelevantChunks(query, topK = 3) {
       ])
       .toArray();
 
-    // Step 3️⃣: Format the results
     const formatted = results.map(r => ({
       text: r.text,
       score: r.score,
