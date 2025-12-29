@@ -4,6 +4,10 @@ import api, { getChatHistory, saveMessage, clearChat } from "../api/apiClient";
 
 const sessionId = "opsmind-default-session"; // later replaced with user-specific id (after auth)
 
+// Small delay helper (controls typing speed)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+
 const ChatUI = ({ stats, setStats }) => {
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
@@ -46,7 +50,7 @@ const ChatUI = ({ stats, setStats }) => {
   setQuery("");
   setIsAnswering(true);
 
-  // Add temporary "thinking" assistant message
+  // Show temporary assistant message
   const tempAssistant = { role: "assistant", content: "Thinking...", thinking: true };
   setMessages((prev) => [...prev, tempAssistant]);
 
@@ -54,23 +58,39 @@ const ChatUI = ({ stats, setStats }) => {
     const res = await api.post("/ask", { query });
     const { answer, sources } = res.data;
 
-    const botMessage = {
-      role: "assistant",
-      content: answer || "No response generated.",
-      citations: (sources || []).map((src, idx) => ({
-        id: idx + 1,
-        name: src,
-      })),
-    };
+    const fullAnswer = answer || "No response generated.";
+    const citations = (sources || []).map((src, idx) => ({
+      id: idx + 1,
+      name: src,
+    }));
 
-    // Replace "thinking" message with actual response
+    // Replace "Thinking..." bubble with empty assistant message
     setMessages((prev) => {
       const updated = [...prev];
-      updated.pop(); // remove temporary thinking bubble
-      return [...updated, botMessage];
+      updated.pop(); // remove the temporary thinking message
+      return [...updated, { role: "assistant", content: "", citations }];
     });
 
-    await saveMessage({ sessionId, ...botMessage });
+    // Token-by-token typing effect
+    const words = fullAnswer.split(" ");
+    for (let i = 0; i < words.length; i++) {
+      await sleep(70); // speed: smaller = faster typing
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        lastMsg.content = words.slice(0, i + 1).join(" ");
+        return [...updated];
+      });
+    }
+
+    // Save final completed message
+    await saveMessage({
+      sessionId,
+      role: "assistant",
+      content: fullAnswer,
+      citations,
+    });
+
     setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
   } catch (err) {
     console.error("❌ Chat error:", err.message);
@@ -85,10 +105,12 @@ const ChatUI = ({ stats, setStats }) => {
         },
       ];
     });
+
   }
 
   setIsAnswering(false);
   };
+
 
 
   const handleClearChat = async () => {
@@ -160,7 +182,13 @@ const ChatUI = ({ stats, setStats }) => {
                     </div>
                   ) : (
                     <>
-                      <p>{msg.content}</p>
+                      <p>
+                          {msg.content}
+                          {isAnswering && idx === messages.length - 1 && (
+                            <span className="typing text-purple-400">█</span>
+                          )}
+                      </p>
+
                       {msg.citations && msg.citations.length > 0 && (
                         <div className="mt-3 border-t border-gray-700 pt-2">
                           <p className="text-xs text-gray-400 mb-1 uppercase">
