@@ -1,53 +1,118 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader, Brain, FileText } from 'lucide-react';
-import api from '../api/apiClient';
+import React, { useState, useRef, useEffect } from "react";
+import { Send, Loader, Brain, FileText } from "lucide-react";
+import api, { getChatHistory, saveMessage, clearChat } from "../api/apiClient";
+
+const sessionId = "opsmind-default-session"; // later replaced with user-specific id (after auth)
 
 const ChatUI = ({ stats, setStats }) => {
   const [messages, setMessages] = useState([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Load chat history on mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      (async () => {
+        try {
+          const res = await getChatHistory(sessionId);
+          const data = res.data;
+        // Defensive check: make sure we always set an array
+        if (Array.isArray(data)) {
+          setMessages(data);
+        } else if (data && Array.isArray(data.messages)) {
+          setMessages(data.messages);
+        } else {
+          setMessages([]);
+        }
+      } catch (err) {
+        console.error("⚠️ Failed to load chat history:", err);
+        setMessages([]); // fallback to empty chat
+      }
+    })();
+  }, []);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleAsk = async () => {
-    if (!query.trim()) return;
-    const userMessage = { role: 'user', content: query };
-    setMessages(prev => [...prev, userMessage, { role: 'assistant', content: 'Thinking...', thinking: true }]);
-    setQuery('');
-    setIsAnswering(true);
+  if (!query.trim()) return;
 
-    try {
-      const res = await api.post('/ask', { query });
-      const { answer, sources } = res.data;
+  const userMessage = { role: "user", content: query };
+  setMessages((prev) => [...prev, userMessage]);
+  await saveMessage({ sessionId, ...userMessage });
 
-      const citations = (sources || []).map((src, idx) => ({
+  setQuery("");
+  setIsAnswering(true);
+
+  // Add temporary "thinking" assistant message
+  const tempAssistant = { role: "assistant", content: "Thinking...", thinking: true };
+  setMessages((prev) => [...prev, tempAssistant]);
+
+  try {
+    const res = await api.post("/ask", { query });
+    const { answer, sources } = res.data;
+
+    const botMessage = {
+      role: "assistant",
+      content: answer || "No response generated.",
+      citations: (sources || []).map((src, idx) => ({
         id: idx + 1,
         name: src,
-      }));
+      })),
+    };
 
-      setMessages(prev => {
-        const updated = [...prev];
-        updated.pop();
-        return [...updated, { role: 'assistant', content: answer, citations }];
-      });
+    // Replace "thinking" message with actual response
+    setMessages((prev) => {
+      const updated = [...prev];
+      updated.pop(); // remove temporary thinking bubble
+      return [...updated, botMessage];
+    });
 
-      setStats(prev => ({ ...prev, queries: prev.queries + 1 }));
+    await saveMessage({ sessionId, ...botMessage });
+    setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
+  } catch (err) {
+    console.error("❌ Chat error:", err.message);
+    setMessages((prev) => {
+      const updated = [...prev];
+      updated.pop(); // remove temporary message
+      return [
+        ...updated,
+        {
+          role: "assistant",
+          content: "⚠️ Error: Could not get a response from AI.",
+        },
+      ];
+    });
+  }
+
+  setIsAnswering(false);
+  };
+
+
+  const handleClearChat = async () => {
+    try {
+      await clearChat(sessionId);
+      setMessages([]);
     } catch (err) {
-      setMessages(prev => {
-        const updated = [...prev];
-        updated.pop();
-        return [...updated, { role: 'assistant', content: '❌ Error: Could not get a response.' }];
-      });
+      console.error("⚠️ Failed to clear chat:", err);
     }
-
-    setIsAnswering(false);
   };
 
   return (
     <div className="flex-1 flex flex-col bg-gray-950 text-white">
+      {/* Chat Header */}
+      <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800 bg-gray-900">
+        <h2 className="text-lg font-semibold text-gray-200">Chat Session</h2>
+        <button
+          onClick={handleClearChat}
+          className="text-sm text-red-400 hover:text-red-300"
+        >
+          Clear Chat
+        </button>
+      </div>
+
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 ? (
@@ -57,29 +122,55 @@ const ChatUI = ({ stats, setStats }) => {
                 <Brain className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-2xl font-bold mb-3">Welcome to OpsMind AI</h3>
-              <p className="text-gray-400 mb-6">Upload your documents and start asking questions.</p>
+              <p className="text-gray-400 mb-6">
+                Upload your documents and ask me anything related to your
+                enterprise SOPs.
+              </p>
+              <div className="space-y-2 text-left max-w-sm mx-auto">
+                <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                  <p className="text-xs text-purple-400 font-semibold mb-1">
+                    Example
+                  </p>
+                  <p className="text-sm text-gray-300">
+                    "Summarize the HR onboarding policy"
+                  </p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                  <p className="text-xs text-purple-400 font-semibold mb-1">
+                    Example
+                  </p>
+                  <p className="text-sm text-gray-300">
+                    "What’s the escalation process for IT issues?"
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
           messages.map((msg, idx) => (
             <div key={idx} className="flex flex-col space-y-2">
-              {msg.role === 'user' && (
+              {msg.role === "user" && (
                 <div className="chat-bubble chat-user">{msg.content}</div>
               )}
-              {msg.role === 'assistant' && (
+              {msg.role === "assistant" && (
                 <div className="chat-bubble chat-assistant">
                   {msg.thinking ? (
                     <div className="flex items-center gap-3 text-gray-400">
-                      <Loader className="w-5 h-5 animate-spin" /> Thinking...
+                      <Loader className="w-5 h-5 animate-spin" /> <span className="typing">Thinking...</span>
                     </div>
                   ) : (
                     <>
                       <p>{msg.content}</p>
                       {msg.citations && msg.citations.length > 0 && (
                         <div className="mt-3 border-t border-gray-700 pt-2">
-                          <p className="text-xs text-gray-400 mb-1 uppercase">Sources</p>
+                          <p className="text-xs text-gray-400 mb-1 uppercase">
+                            Sources
+                          </p>
                           {msg.citations.map((c, i) => (
-                            <div key={i} className="flex items-center gap-2 text-xs text-purple-400">
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 text-xs text-purple-400"
+                            >
                               <FileText className="w-3 h-3" /> {c.name}
                             </div>
                           ))}
@@ -111,7 +202,11 @@ const ChatUI = ({ stats, setStats }) => {
             disabled={!query.trim() || isAnswering}
             className="btn-gradient"
           >
-            {isAnswering ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            {isAnswering ? (
+              <Loader className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>
