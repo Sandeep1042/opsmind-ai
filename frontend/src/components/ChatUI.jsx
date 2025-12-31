@@ -8,12 +8,29 @@ const sessionId = "opsmind-default-session"; // later replaced with user-specifi
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
-const ChatUI = ({ stats, setStats }) => {
+const ChatUI = ({ stats, setStats, uploadNotification }) => {
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
   const [shake, setShake] = useState(false);
   const messagesEndRef = useRef(null);
+  const prevNotificationRef = useRef(null);
+
+  // Handle upload completion notification
+  useEffect(() => {
+    // Only show notification when uploadNotification changes from false/null to true
+    if (uploadNotification && uploadNotification !== prevNotificationRef.current) {
+      const notificationMsg = {
+        role: "system",
+        type: "upload-success",
+        content: "Document uploaded. Please ask relevant questions.",
+      };
+      setMessages((prev) => [...prev, notificationMsg]);
+      // Persist notification (optional)
+      saveMessage({ sessionId, ...notificationMsg }).catch(() => {});
+      prevNotificationRef.current = uploadNotification;
+    }
+  }, [uploadNotification]);
 
   // Load chat history on mount
   useEffect(() => {
@@ -201,6 +218,14 @@ const ChatUI = ({ stats, setStats }) => {
             <div key={idx} className="flex flex-col space-y-2">
               {msg.role === "user" && (
                 <div className="chat-bubble chat-user">{msg.content}</div>
+              )}
+              {msg.role === "system" && msg.type === "upload-success" && (
+                <div className="upload-notification-card">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <p className="text-sm text-green-100 font-medium">{msg.content}</p>
+                  </div>
+                </div>
               )}
               {msg.role === "assistant" && (
                 <div className={msg.warning ? "chat-bubble border border-red-500 bg-red-900/60 text-red-100" : "chat-bubble chat-assistant"}>

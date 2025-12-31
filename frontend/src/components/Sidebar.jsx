@@ -1,7 +1,7 @@
 import React from 'react';
-import { Brain, Upload, Trash2 } from 'lucide-react';
+import { Brain, Upload, Trash2, Loader } from 'lucide-react';
 
-const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing }) => {
+const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing, uploadProgress }) => {
   return (
     <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-glow">
       {/* Header */}
@@ -52,6 +52,27 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing }) => {
           onChange={onUpload}
           style={{ display: 'none' }}
         />
+
+        {/* Progress Bar */}
+        {isProcessing && uploadProgress.stage && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400 flex items-center gap-2">
+                {uploadProgress.percentage < 100 ? (
+                  <Loader className="w-3 h-3 animate-spin" />
+                ) : null}
+                {uploadProgress.stage}
+              </span>
+              <span className="text-xs text-gray-500">{uploadProgress.percentage}%</span>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+              <div 
+                className="progress-bar-fill h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress.percentage}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Clear Button */}
         <button
