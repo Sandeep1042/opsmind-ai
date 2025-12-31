@@ -7,6 +7,7 @@ import searchRoutes from "./routes/search.js";
 import testQueryRoutes from "./routes/testQuery.js";
 import askRoutes from "./routes/ask.js";
 import chatRoutes from "./routes/chat.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 dotenv.config();
 const app = express();
@@ -23,6 +24,7 @@ app.use("/api/search", searchRoutes);
 app.use("/api/test", testQueryRoutes);
 app.use("/api/ask", askRoutes);
 app.use("/api/chat", chatRoutes);
+app.use(errorHandler);
 
 app.get("/", (req, res) => {
   res.send("OpsMind AI backend running!");

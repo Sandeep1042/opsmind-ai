@@ -24,13 +24,15 @@ const App = () => {
       setStats(prev => ({
         ...prev,
         totalDocs: prev.totalDocs + 1,
-        totalChunks: prev.totalChunks + res.data.chunks,
+        totalChunks: prev.totalChunks + res.data.totalChunks,
       }));
     } catch (err) {
       alert('❌ Upload failed: ' + (err.response?.data?.error || err.message));
+    } finally {
+      // Reset file input so the same file can be uploaded again
+      fileInputRef.current.value = '';
+      setIsProcessing(false);
     }
-
-    setIsProcessing(false);
   };
 
   const handleClear = () => {
