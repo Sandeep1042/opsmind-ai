@@ -24,7 +24,7 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing }) => {
           </div>
           <div className="sidebar-card">
             <div className="value text-blue-400">{stats.totalChunks}</div>
-            <h4>Chunks</h4>
+            <h4>Pages</h4>
           </div>
           <div className="sidebar-card">
             <div className="value text-green-400">{stats.queries}</div>

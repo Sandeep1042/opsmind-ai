@@ -41,7 +41,14 @@ Answer:
     res.json({
       query,
       answer,
-      sources: topChunks.map(c => c.source),
+      sources: topChunks.map(c => ({
+        source: c.source,
+        page: c.page,
+        lineStartPage: c.lineStartPage,
+        lineEndPage: c.lineEndPage,
+        chunk: c.chunkIndex,
+        text: c.text,
+      })),
     });
   } catch (err) {
     console.error("❌ /ask error:", err);

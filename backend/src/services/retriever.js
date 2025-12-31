@@ -27,11 +27,22 @@ export async function retrieveRelevantChunks(query, topK = 3) {
       ])
       .toArray();
 
-    const formatted = results.map(r => ({
-      text: r.text,
-      score: r.score,
-      source: r.source,
-    }));
+    const formatted = results.map(r => {
+      // $vectorSearch in Atlas may return the matched document fields either at top-level
+      // or under `document` depending on options. Handle both shapes.
+      const doc = r.document || r;
+
+      return {
+        text: doc.text || r.text || '',
+        score: r.score ?? doc.score ?? 0,
+        source: doc.source || r.source || 'unknown',
+        page: doc.page ?? r.page,
+        chunkIndex: doc.chunkIndex ?? r.chunkIndex,
+        // prefer page-local line numbers if available
+        lineStartPage: doc.lineStartPage ?? doc.lineStart ?? r.lineStart,
+        lineEndPage: doc.lineEndPage ?? doc.lineEnd ?? r.lineEnd,
+      };
+    });
 
     console.log(`🔎 Retrieved ${formatted.length} relevant chunks`);
     return formatted;

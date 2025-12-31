@@ -25,24 +25,31 @@ router.post("/", upload.single("file"), async (req, res) => {
     const savedDocs = [];
 
     for (let i = 0; i < chunks.length; i++) {
-      const text = chunks[i];
+      const c = chunks[i];
+      const text = c.text;
       const embedding = await generateEmbedding(text);
 
       const doc = new Chunk({
         text,
         embedding,
         source: req.file.originalname,
+        page: c.page,
+        chunkIndex: c.chunkIndex,
+        lineStartPage: c.lineStartPage,
+        lineEndPage: c.lineEndPage,
       });
 
       await doc.save();
       savedDocs.push(doc);
 
-      console.log(`✅ Stored chunk ${i + 1}/${chunks.length}`);
+      console.log(`✅ Stored chunk ${i + 1}/${chunks.length} (page ${c.page}, chunk ${c.chunkIndex})`);
     }
 
+    const pagesIndexed = new Set(savedDocs.map(d => d.page)).size;
     res.json({
       message: "✅ PDF processed & embeddings stored (local model)",
       totalChunks: savedDocs.length,
+      totalPages: pagesIndexed,
     });
   } catch (err) {
     console.error("❌ Upload error:", err);

@@ -6,14 +6,18 @@ const router = express.Router();
 // 🟢 Save a chat message
 router.post("/", async (req, res) => {
   try {
-    const { sessionId, role, content } = req.body;
+    const { sessionId, role, content, citations } = req.body;
     if (!sessionId || !role || !content)
       return res.status(400).json({ error: "Missing fields" });
 
     let chat = await Chat.findOne({ sessionId });
     if (!chat) chat = new Chat({ sessionId, messages: [] });
 
-    chat.messages.push({ role, content });
+    // Save citations if provided (assistant messages)
+    const message = { role, content };
+    if (citations) message.citations = citations;
+
+    chat.messages.push(message);
     await chat.save();
 
     res.status(201).json({ message: "Message saved", chat });

@@ -59,10 +59,8 @@ const ChatUI = ({ stats, setStats }) => {
     const { answer, sources } = res.data;
 
     const fullAnswer = answer || "No response generated.";
-    const citations = (sources || []).map((src, idx) => ({
-      id: idx + 1,
-      name: src,
-    }));
+    // Expect sources to be an array of objects: { source, page, lineStart, lineEnd, chunk, match, text }
+    const citations = (sources || []).map((s, idx) => ({ id: idx + 1, ...s }));
 
     // Replace "Thinking..." bubble with empty assistant message
     setMessages((prev) => {
@@ -195,11 +193,22 @@ const ChatUI = ({ stats, setStats }) => {
                             Sources
                           </p>
                           {msg.citations.map((c, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center gap-2 text-xs text-purple-400"
-                            >
-                              <FileText className="w-3 h-3" /> {c.name}
+                            <div key={i} className="mb-3 bg-gray-800 rounded-lg p-3 border border-gray-700">
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-purple-400" />
+                                  <div className="text-sm text-purple-300 font-semibold">{c.source}</div>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {c.match !== undefined ? `${(c.match > 1 ? c.match : c.match * 100).toFixed(1)}% match` : ''}
+                                </div>
+                              </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                Page {c.page ?? '-'} • Line {c.lineStartPage ?? c.lineStart ?? '-'}-{c.lineEndPage ?? c.lineEnd ?? '-'} • Chunk {c.chunk ?? c.chunkIndex ?? '-'}
+                              </div>
+                                {c.text && (
+                                <div className="mt-2 text-sm text-gray-300 italic">{c.text.length > 320 ? c.text.slice(0, 320) + '…' : c.text}</div>
+                              )}
                             </div>
                           ))}
                         </div>

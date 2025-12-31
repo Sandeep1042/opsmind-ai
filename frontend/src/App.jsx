@@ -1,12 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatUI from './components/ChatUI';
 import api from './api/apiClient';
 
 const App = () => {
-  const [stats, setStats] = useState({ totalDocs: 0, totalChunks: 0, queries: 0 });
+  const [stats, setStats] = useState(() => {
+    // Load stats from localStorage on initial load
+    const savedStats = localStorage.getItem('opsmindStats');
+    return savedStats ? JSON.parse(savedStats) : { totalDocs: 0, totalChunks: 0, queries: 0 };
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef();
+
+  // Save stats to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('opsmindStats', JSON.stringify(stats));
+  }, [stats]);
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
@@ -24,7 +33,7 @@ const App = () => {
       setStats(prev => ({
         ...prev,
         totalDocs: prev.totalDocs + 1,
-        totalChunks: prev.totalChunks + res.data.totalChunks,
+        totalChunks: prev.totalChunks + (res.data.totalPages || res.data.totalChunks || 0),
       }));
     } catch (err) {
       alert('❌ Upload failed: ' + (err.response?.data?.error || err.message));
@@ -36,7 +45,9 @@ const App = () => {
   };
 
   const handleClear = () => {
-    setStats({ totalDocs: 0, totalChunks: 0, queries: 0 });
+    const emptyStats = { totalDocs: 0, totalChunks: 0, queries: 0 };
+    setStats(emptyStats);
+    localStorage.setItem('opsmindStats', JSON.stringify(emptyStats));
   };
 
   return (
