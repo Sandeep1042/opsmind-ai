@@ -12,6 +12,7 @@ const ChatUI = ({ stats, setStats }) => {
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
+  const [shake, setShake] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Load chat history on mount
@@ -39,6 +40,27 @@ const ChatUI = ({ stats, setStats }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Handler: if user focuses/clicks input but no docs uploaded, show shake + AI message
+  const handleInputInteraction = (e) => {
+    const docs = (stats && typeof stats.totalDocs !== 'undefined') ? stats.totalDocs : 0;
+    if (docs === 0) {
+      // prevent focus
+      try { e.target.blur(); } catch (err) {}
+
+      // animate
+      setShake(true);
+      setTimeout(() => setShake(false), 650);
+
+      // avoid duplicate message
+      setMessages((prev) => {
+        const assistantMsg = { role: 'assistant', content: 'Please upload a document first', warning: true };
+        // persist message (best-effort)
+        saveMessage({ sessionId, ...assistantMsg }).catch(() => {});
+        return [...prev, assistantMsg];
+      });
+    }
+  };
 
   const handleAsk = async () => {
   if (!query.trim()) return;
@@ -173,7 +195,7 @@ const ChatUI = ({ stats, setStats }) => {
                 <div className="chat-bubble chat-user">{msg.content}</div>
               )}
               {msg.role === "assistant" && (
-                <div className="chat-bubble chat-assistant">
+                <div className={msg.warning ? "chat-bubble border border-red-500 bg-red-900/60 text-red-100" : "chat-bubble chat-assistant"}>
                   {msg.thinking ? (
                     <div className="flex items-center gap-3 text-gray-400">
                       <Loader className="w-5 h-5 animate-spin" /> <span className="typing">Thinking...</span>
@@ -230,8 +252,9 @@ const ChatUI = ({ stats, setStats }) => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onClick={handleInputInteraction}
             placeholder="Ask a question..."
-            className="input-field"
+            className={`input-field ${shake ? 'animate-shake' : ''}`}
             disabled={isAnswering}
           />
           <button
