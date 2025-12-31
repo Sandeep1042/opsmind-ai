@@ -84,11 +84,11 @@ const ChatUI = ({ stats, setStats }) => {
     // Expect sources to be an array of objects: { source, page, lineStart, lineEnd, chunk, match, text }
     const citations = (sources || []).map((s, idx) => ({ id: idx + 1, ...s }));
 
-    // Replace "Thinking..." bubble with empty assistant message
+    // Replace "Thinking..." bubble with empty assistant message (without citations initially)
     setMessages((prev) => {
       const updated = [...prev];
       updated.pop(); // remove the temporary thinking message
-      return [...updated, { role: "assistant", content: "", citations }];
+      return [...updated, { role: "assistant", content: "" }];
     });
 
     // Token-by-token typing effect
@@ -102,6 +102,14 @@ const ChatUI = ({ stats, setStats }) => {
         return [...updated];
       });
     }
+
+    // Add citations after typing is complete
+    setMessages((prev) => {
+      const updated = [...prev];
+      const lastMsg = updated[updated.length - 1];
+      lastMsg.citations = citations;
+      return [...updated];
+    });
 
     // Save final completed message
     await saveMessage({
@@ -210,7 +218,7 @@ const ChatUI = ({ stats, setStats }) => {
                       </p>
 
                       {msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-3 border-t border-gray-700 pt-2">
+                        <div className="mt-3 border-t border-gray-700 pt-2 sources-dropdown">
                           <p className="text-xs text-gray-400 mb-1 uppercase">
                             Sources
                           </p>
