@@ -11,7 +11,7 @@ router.post("/", async (req, res) => {
 
     console.log("🔍 Query:", query);
 
-    // Step 1 — Retrieve top chunks
+    // Retrieve top chunks
     const topChunks = await retrieveRelevantChunks(query, 3);
     if (!topChunks.length)
       return res.json({
@@ -20,7 +20,7 @@ router.post("/", async (req, res) => {
 
     const context = topChunks.map(c => c.text).join("\n---\n");
 
-    // Step 2 — Build prompt
+    // Build prompt
     const prompt = `
 You are OpsMind AI, a corporate knowledge assistant.
 Answer the user's question using only the context below.
@@ -35,7 +35,7 @@ ${query}
 Answer:
 `;
 
-    // Step 3 — Generate answer via Ollama
+    // Generate answer via Ollama
     const answer = await generateOllamaResponse(prompt);
 
     res.json({
