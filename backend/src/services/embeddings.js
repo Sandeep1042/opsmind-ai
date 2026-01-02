@@ -13,7 +13,7 @@ async function loadModel() {
 }
 
 /**
- * Generate numeric embeddings for input text
+  Generate numeric embeddings for input text
  */
 export async function generateEmbedding(text) {
   try {
