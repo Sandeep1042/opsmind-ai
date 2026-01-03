@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Navbar from "./components/Navbar";
 import Sidebar from './components/Sidebar';
 import ChatUI from './components/ChatUI';
 import api from './api/apiClient';
@@ -96,16 +97,20 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white">
-      <Sidebar
-        stats={stats}
-        onUpload={handleUpload}
-        onClear={handleClear}
-        fileInputRef={fileInputRef}
-        isProcessing={isProcessing}
-        uploadProgress={uploadProgress}
-      />
-      <ChatUI stats={stats} setStats={setStats} uploadNotification={uploadNotification} />
+    <div className="flex flex-col h-screen bg-gray-950 text-white">
+      <Navbar />
+      
+      <div className="flex flex-1 bg-gray-950 text-white">
+        <Sidebar
+          stats={stats}
+          onUpload={handleUpload}
+          onClear={handleClear}
+          fileInputRef={fileInputRef}
+          isProcessing={isProcessing}
+          uploadProgress={uploadProgress}
+        />
+        <ChatUI stats={stats} setStats={setStats} uploadNotification={uploadNotification} />
+      </div>
     </div>
   );
 };

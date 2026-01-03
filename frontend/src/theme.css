@@ -213,3 +213,12 @@ p {
   scrollbar-color: rgba(124, 58, 237, 0.5) transparent;
   scrollbar-width: thin;
 }
+
+
+.navbar-glow {
+  box-shadow: 0 2px 20px rgba(124, 58, 237, 0.1);
+}
+
+.upload-card:hover {
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.3);
+}

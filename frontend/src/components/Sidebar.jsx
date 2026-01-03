@@ -5,17 +5,9 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing, uploadP
   return (
     <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-glow">
       {/* Header */}
-      <div className="p-6 border-b border-gray-800">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center float">
-            <Brain className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">OpsMind AI</h1>
-            <p className="text-xs text-gray-400">RAG Assistant</p>
-          </div>
-        </div>
+      <div className="p-5 border-b border-gray-800 space-y-4">
 
+        
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="sidebar-card">
@@ -32,26 +24,38 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing, uploadP
           </div>
         </div>
 
-        {/* Upload Button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
-          className="btn-gradient w-full"
+        {/* Upload Panel Card */}
+        <div
+          onClick={() => !isProcessing && fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-2xl p-6 mt-2 text-center cursor-pointer transition-all duration-300 
+            ${isProcessing 
+              ? "border-gray-700 bg-gray-900/60 cursor-not-allowed" 
+              : "border-gray-700 hover:border-purple-500 hover:bg-gray-800/60"
+            }`}
         >
-          {isProcessing ? 'Processing...' : (
-            <>
-              <Upload className="w-5 h-5 inline mr-2" />
-              Upload PDF
-            </>
-          )}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf"
-          onChange={onUpload}
-          style={{ display: 'none' }}
-        />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={onUpload}
+            style={{ display: "none" }}
+          />
+
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg float">
+              <Upload className="w-6 h-6 text-white" />
+            </div>
+          
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {isProcessing ? "Processing file..." : "Upload or drag a PDF file"}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Supported format: PDF
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Progress Bar */}
         {isProcessing && uploadProgress.stage && (
