@@ -36,7 +36,7 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing, uploadP
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.doc,.docx,.md,.txt"
             onChange={onUpload}
             style={{ display: "none" }}
           />
@@ -51,7 +51,13 @@ const Sidebar = ({ stats, onUpload, onClear, fileInputRef, isProcessing, uploadP
                 {isProcessing ? "Processing file..." : "Upload or drag a PDF file"}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Supported format: PDF
+                Supported format: TXT, MD, DOC, DOCX, PDF
+              </p>
+
+              {/* Description below box */}
+              <p className="text-sm text-slate-500 mt-6 leading-relaxed text-center">
+                Upload your documents to start asking questions. The AI will analyze the content
+                and provide relevant answers.
               </p>
             </div>
           </div>
