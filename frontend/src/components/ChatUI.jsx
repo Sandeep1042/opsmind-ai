@@ -4,7 +4,7 @@ import api, { getChatHistory, saveMessage, clearChat } from "../api/apiClient";
 
 const sessionId = "opsmind-default-session";
 
-const ChatUI = ({ stats, setStats }) => {
+const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
@@ -31,6 +31,22 @@ const ChatUI = ({ stats, setStats }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (systemMessage) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "system",
+          type: systemMessage.type,
+          content: systemMessage.content,
+          timestamp: new Date(),
+        },
+      ]);
+      setSystemMessage(null);
+    }
+  }, [systemMessage, setSystemMessage]);
 
   // helper for simulated typing delay
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,23 +78,32 @@ const ChatUI = ({ stats, setStats }) => {
       const res = await api.post("/ask", { query });
       const { answer, sources } = res.data;
 
-      const rawAnswer = answer || "No response generated.";
-      const lower = rawAnswer.toLowerCase();
-      const isUnknown = lower.includes("don't know") || lower.includes("dont know") || lower.includes("do not know");
-      const finalAnswer = isUnknown ? "I don't know, please ask relevant questions." : rawAnswer;
+      const normalizeSource = (src, idx) => {
+        if (!src) return { id: idx + 1, source: `Source ${idx + 1}` };
+        if (typeof src === "string") return { id: idx + 1, source: src };
 
-      const hideCitations = isUnknown;
-      const citations = hideCitations
-        ? []
-        : (sources || []).map((src, idx) => ({
+        if (typeof src === "object") {
+          const sourceLabel = [src.source, src.name, src.fileName, src.title]
+            .find((val) => typeof val === "string" && val.trim());
+
+          return {
             id: idx + 1,
-            source: toText(src?.source ?? src?.name ?? src?.file ?? src ?? "Unknown"),
-            page: src?.page ?? src?.pageNumber ?? src?.page_index ?? src?.pageIndex,
-            lineStart: src?.lineStartPage ?? src?.lineStart,
-            lineEnd: src?.lineEndPage ?? src?.lineEnd,
-            chunk: src?.chunk ?? src?.chunkIndex,
-            text: typeof src?.text === "string" ? src.text : toText(src?.text ?? ""),
-          }));
+            source: sourceLabel || `Source ${idx + 1}`,
+            page: src.page ?? src.pageNumber ?? src.lineStartPage ?? src.lineStart,
+            chunk: src.chunk ?? src.chunkIndex ?? src.section ?? src.lineEndPage,
+            text: typeof src.text === "string"
+              ? src.text
+              : typeof src.chunk === "string"
+                ? src.chunk
+                : "",
+          };
+        }
+
+        return { id: idx + 1, source: String(src) };
+      };
+
+      const fullAnswer = answer || "No response generated.";
+      const citations = (Array.isArray(sources) ? sources : []).map(normalizeSource);
 
       // Replace temp with empty assistant message
       setMessages((prev) => {
@@ -88,7 +113,7 @@ const ChatUI = ({ stats, setStats }) => {
       });
 
       // Typing animation (word-by-word)
-      const words = finalAnswer.split(" ");
+      const words = fullAnswer.split(" ");
       for (let i = 0; i < words.length; i++) {
         await sleep(30);
         setMessages((prev) => {
@@ -102,7 +127,7 @@ const ChatUI = ({ stats, setStats }) => {
       await saveMessage({
         sessionId,
         role: "assistant",
-        content: finalAnswer,
+        content: fullAnswer,
         citations,
       });
 
@@ -156,9 +181,9 @@ const ChatUI = ({ stats, setStats }) => {
       : [];
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-950 text-white">
+    <div className="flex-1 flex flex-col bg-gray-950 text-white overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900">
+      <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Brain className="w-5 h-5 text-purple-400" />
           <h2 className="font-semibold">OpsMind AI — Chat Assistant</h2>
@@ -172,7 +197,7 @@ const ChatUI = ({ stats, setStats }) => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
         {safeMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="bg-gradient-to-br from-purple-500 to-blue-500 p-4 rounded-full mb-4">
@@ -199,35 +224,44 @@ const ChatUI = ({ stats, setStats }) => {
         ) : (
           <>
             {safeMessages.map((msg, idx) => (
-              <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                    msg.role === "user"
-                      ? "bg-gradient-to-br from-purple-600 to-blue-600"
-                      : "bg-gradient-to-br from-blue-500 to-purple-600"
-                  }`}
-                >
-                  {msg.role === "user" ? (
-                    <User className="w-4 h-4 text-white" />
-                  ) : (
-                    <Bot className="w-4 h-4 text-white" />
-                  )}
-                </div>
+              <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : msg.role === "system" ? "justify-center" : "flex-row"}`}>
+                {msg.role !== "system" && (
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                      msg.role === "user"
+                        ? "bg-gradient-to-br from-purple-600 to-blue-600"
+                        : "bg-gradient-to-br from-blue-500 to-purple-600"
+                    }`}
+                  >
+                    {msg.role === "user" ? (
+                      <User className="w-4 h-4 text-white" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                )}
                 <div
                   className={`flex-1 max-w-2xl ${
-                    msg.role === "user" ? "items-end" : "items-start"
+                    msg.role === "user" ? "items-end" : msg.role === "system" ? "items-center" : "items-start"
                   } flex flex-col`}
                 >
                   <div
                     className={`px-4 py-3 rounded-2xl shadow ${
                       msg.role === "user"
                         ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                        : "bg-gray-800 text-gray-100"
+                        : msg.role === "system" && msg.type === "error"
+                          ? "bg-red-900/80 border border-red-700 text-red-100"
+                          : "bg-gray-800 text-gray-100"
                     }`}
                   >
                     {msg.thinking ? (
                       <div className="flex items-center gap-2 text-gray-400">
                         <Loader className="w-4 h-4 animate-spin" /> Thinking...
+                      </div>
+                    ) : msg.role === "system" && msg.type === "error" ? (
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <p className="whitespace-pre-wrap">{toText(msg.content)}</p>
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{toText(msg.content)}</p>
@@ -238,10 +272,14 @@ const ChatUI = ({ stats, setStats }) => {
                     <div className="mt-3 border-t border-gray-700 pt-2 space-y-2">
                       <p className="text-xs text-gray-400 uppercase mb-2">Sources</p>
                       {msg.citations.map((c, i) => {
-                        const sourceLabel = toText(c.source || c.name || "Unknown");
+                        const sourceLabel = typeof c.source === "string" && c.source.trim()
+                          ? c.source
+                          : typeof c.name === "string" && c.name.trim()
+                            ? c.name
+                            : `Source ${i + 1}`;
                         const pageLabel = c.page ?? c.pageNumber ?? "-";
                         const chunkLabel = c.chunk ?? c.chunkIndex ?? "-";
-                        const preview = toText(c.text || "");
+                        const preview = typeof c.text === "string" ? c.text : "";
                         return (
                           <div key={i} className="bg-gray-800/50 rounded-lg p-2 text-xs text-gray-300 border border-gray-700/60">
                             <div className="flex items-center gap-2 mb-1">
@@ -259,7 +297,9 @@ const ChatUI = ({ stats, setStats }) => {
                       })}
                     </div>
                   )}
-                  <span className="text-xs text-gray-500 mt-1">{formatTime(msg.timestamp)}</span>
+                  {msg.role !== "system" && (
+                    <span className="text-xs text-gray-500 mt-1">{formatTime(msg.timestamp)}</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -269,7 +309,7 @@ const ChatUI = ({ stats, setStats }) => {
       </div>
 
       {/* Input Section */}
-      <div className="bg-gray-900 border-t border-gray-800 p-4">
+      <div className="bg-gray-900 border-t border-gray-800 p-4 flex-shrink-0">
         {!stats.totalDocs && (
           <div className="mb-3 flex items-center gap-2 text-sm text-amber-500 bg-amber-900/30 px-3 py-2 rounded-lg">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
