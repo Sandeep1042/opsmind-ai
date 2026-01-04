@@ -28,6 +28,29 @@ const App = () => {
     localStorage.setItem("opsmindStats", JSON.stringify(stats));
   }, [stats]);
 
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+    const userParam = urlParams.get("user");
+    
+    if (token && userParam) {
+      try {
+        const user = JSON.parse(decodeURIComponent(userParam));
+        localStorage.setItem("authToken", token);
+        localStorage.setItem("user", JSON.stringify(user));
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Reload to update navbar
+        window.location.reload();
+      } catch (error) {
+        console.error("Error parsing OAuth callback:", error);
+      }
+    }
+  }, []);
+
   // ✅ Upload handler (fixed)
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
