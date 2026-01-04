@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Brain, Moon, Sun, History, LogIn } from "lucide-react";
-import AuthModal from "./AuthModal"; // 👈 import it
+import { Brain, Moon, Sun, History, LogIn, LogOut, User } from "lucide-react";
+import AuthModal from "./AuthModal";
 
 const Navbar = () => {
   const [theme, setTheme] = useState("dark");
-  const [showAuth, setShowAuth] = useState(false); // 👈 new
+  const [showAuth, setShowAuth] = useState(false);
+  const [user, setUser] = useState(null);
 
   // Load & apply theme on mount
   useEffect(() => {
@@ -15,6 +16,12 @@ const Navbar = () => {
     } else {
       document.documentElement.classList.add("dark");
     }
+
+    // Check if user is logged in
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -22,6 +29,16 @@ const Navbar = () => {
     setTheme(newTheme);
     document.documentElement.classList.toggle("dark", newTheme === "dark");
     localStorage.setItem("theme", newTheme);
+  };
+
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
+    setUser(null);
   };
 
   return (
@@ -64,19 +81,39 @@ const Navbar = () => {
             History
           </button>
 
-          {/* Sign In */}
-          <button
-            onClick={() => setShowAuth(true)} // 👈 open modal
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all"
-          >
-            <LogIn className="w-4 h-4" />
-            Sign In
-          </button>
+          {/* User / Sign In */}
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                <User className="w-4 h-4" />
+                <span className="font-medium text-sm">{user.name}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAuth(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign In
+            </button>
+          )}
         </div>
       </nav>
 
       {/* Auth Modal (appears on Sign In click) */}
-      <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
+      <AuthModal 
+        isOpen={showAuth} 
+        onClose={() => setShowAuth(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </>
   );
 };

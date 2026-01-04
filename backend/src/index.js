@@ -8,17 +8,16 @@ import testQueryRoutes from "./routes/testQuery.js";
 import askRoutes from "./routes/ask.js";
 import chatRoutes from "./routes/chat.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { connectDB } from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
+connectDB();
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ DB connection error:", err));
-
+app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/test", testQueryRoutes);
