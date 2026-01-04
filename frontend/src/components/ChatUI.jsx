@@ -109,7 +109,7 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
       setMessages((prev) => {
         const updated = [...prev];
         updated.pop();
-        return [...updated, { role: "assistant", content: "", citations, timestamp: new Date() }];
+        return [...updated, { role: "assistant", content: "", citations: [], showCitations: false, timestamp: new Date() }];
       });
 
       // Typing animation (word-by-word)
@@ -123,6 +123,16 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
           return [...updated];
         });
       }
+
+      // Show citations with animation after typing completes
+      await sleep(200);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        lastMsg.citations = citations;
+        lastMsg.showCitations = true;
+        return [...updated];
+      });
 
       await saveMessage({
         sessionId,
@@ -181,16 +191,16 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
       : [];
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-950 text-white overflow-hidden">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900 flex-shrink-0">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-100 dark:bg-gray-900 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-purple-400" />
-          <h2 className="font-semibold">OpsMind AI — Chat Assistant</h2>
+          <Brain className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white">OpsMind AI — Chat Assistant</h2>
         </div>
         <button
           onClick={() => clearChat(sessionId) && setMessages([])}
-          className="text-xs text-gray-400 hover:text-white transition"
+          className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
         >
           Clear Chat
         </button>
@@ -203,8 +213,8 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
             <div className="bg-gradient-to-br from-purple-500 to-blue-500 p-4 rounded-full mb-4">
               <Brain className="w-10 h-10 text-white" />
             </div>
-            <h3 className="text-xl font-bold mb-2">Welcome to OpsMind AI</h3>
-            <p className="text-gray-400 max-w-md mb-4">
+            <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Welcome to OpsMind AI</h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mb-4">
               Upload your document and ask questions. OpsMind will analyze, summarize, and answer contextually.
             </p>
             <div className="mt-4 space-y-2 w-full max-w-md">
@@ -213,7 +223,7 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
                   <button
                     key={i}
                     onClick={() => setQuery(example)}
-                    className="w-full text-left px-4 py-2 bg-gray-800/50 hover:bg-gray-800 rounded-lg text-sm text-gray-300 transition-all"
+                    className="w-full text-left px-4 py-2 bg-gray-200 dark:bg-gray-800/50 hover:bg-gray-300 dark:hover:bg-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition-all"
                   >
                     {example}
                   </button>
@@ -250,8 +260,8 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
                       msg.role === "user"
                         ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
                         : msg.role === "system" && msg.type === "error"
-                          ? "bg-red-900/80 border border-red-700 text-red-100"
-                          : "bg-gray-800 text-gray-100"
+                          ? "bg-red-100 dark:bg-red-900/80 border border-red-300 dark:border-red-700 text-red-900 dark:text-red-100"
+                          : "bg-white dark:bg-gray-800 text-black dark:text-gray-100 border border-gray-200 dark:border-gray-700"
                     }`}
                   >
                     {msg.thinking ? (
@@ -268,9 +278,9 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
                     )}
                   </div>
 
-                  {Array.isArray(msg.citations) && msg.citations.length > 0 && (
-                    <div className="mt-3 border-t border-gray-700 pt-2 space-y-2">
-                      <p className="text-xs text-gray-400 uppercase mb-2">Sources</p>
+                  {Array.isArray(msg.citations) && msg.citations.length > 0 && msg.showCitations && (
+                    <div className="mt-3 border-t border-gray-300 dark:border-gray-700 pt-2 space-y-2 sources-dropdown">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Sources</p>
                       {msg.citations.map((c, i) => {
                         const sourceLabel = typeof c.source === "string" && c.source.trim()
                           ? c.source
@@ -281,15 +291,15 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
                         const chunkLabel = c.chunk ?? c.chunkIndex ?? "-";
                         const preview = typeof c.text === "string" ? c.text : "";
                         return (
-                          <div key={i} className="bg-gray-800/50 rounded-lg p-2 text-xs text-gray-300 border border-gray-700/60">
+                          <div key={i} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-2 text-xs text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700/60">
                             <div className="flex items-center gap-2 mb-1">
-                              <FileText className="w-3 h-3 text-purple-400" />
-                              <span className="font-semibold text-white">{sourceLabel}</span>
+                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                              <span className="font-semibold text-gray-900 dark:text-white">{sourceLabel}</span>
                             </div>
                             {preview && (
-                              <p className="text-gray-400 italic">{preview.length > 160 ? `${preview.slice(0, 160)}…` : preview}</p>
+                              <p className="text-gray-600 dark:text-gray-400 italic">{preview.length > 160 ? `${preview.slice(0, 160)}…` : preview}</p>
                             )}
-                            <div className="text-[11px] text-gray-500 mt-1">
+                            <div className="text-[11px] text-gray-500 dark:text-gray-500 mt-1">
                               Page {pageLabel} • Chunk {chunkLabel}
                             </div>
                           </div>
@@ -298,7 +308,7 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
                     </div>
                   )}
                   {msg.role !== "system" && (
-                    <span className="text-xs text-gray-500 mt-1">{formatTime(msg.timestamp)}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">{formatTime(msg.timestamp)}</span>
                   )}
                 </div>
               </div>
@@ -309,9 +319,9 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
       </div>
 
       {/* Input Section */}
-      <div className="bg-gray-900 border-t border-gray-800 p-4 flex-shrink-0">
+      <div className="bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
         {!stats.totalDocs && (
-          <div className="mb-3 flex items-center gap-2 text-sm text-amber-500 bg-amber-900/30 px-3 py-2 rounded-lg">
+          <div className="mb-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-500 bg-amber-100 dark:bg-amber-900/30 px-3 py-2 rounded-lg">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>Please upload a document before asking questions</span>
           </div>
@@ -326,7 +336,7 @@ const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
               stats.totalDocs ? "Ask a question about your document..." : "Upload a document first..."
             }
             disabled={!stats.totalDocs || isAnswering}
-            className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+            className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 border border-gray-300 dark:border-gray-700"
           />
           <button
             onClick={handleAsk}

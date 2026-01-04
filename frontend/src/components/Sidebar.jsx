@@ -19,7 +19,7 @@ const DocumentList = ({ documents, selectedId, onSelect, onDelete }) => {
 
   if (!documents || documents.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-gray-400 dark:text-gray-500">
         <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
         <p className="text-sm">No documents uploaded yet</p>
       </div>
@@ -34,25 +34,25 @@ const DocumentList = ({ documents, selectedId, onSelect, onDelete }) => {
           onClick={() => onSelect(doc.id)}
           className={`group relative p-3 rounded-lg border cursor-pointer transition-all ${
             selectedId === doc.id
-              ? "border-purple-500 bg-gray-800/80"
-              : "border-gray-800 hover:border-gray-700 hover:bg-gray-900/80"
+              ? "border-purple-500 bg-purple-50 dark:bg-gray-800/80"
+              : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/80"
           }`}
         >
           <div className="flex items-start gap-3">
             <FileText
               className={`w-4 h-4 mt-1 flex-shrink-0 ${
-                selectedId === doc.id ? "text-purple-400" : "text-gray-500"
+                selectedId === doc.id ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500"
               }`}
             />
             <div className="flex-1 min-w-0">
               <p
                 className={`truncate text-sm font-medium ${
-                  selectedId === doc.id ? "text-purple-300" : "text-gray-200"
+                  selectedId === doc.id ? "text-purple-700 dark:text-purple-300" : "text-gray-800 dark:text-gray-200"
                 }`}
               >
                 {doc.name}
               </p>
-              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-500">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   {formatDate(doc.uploadedAt)}
@@ -91,9 +91,9 @@ const Sidebar = ({
 }) => {
 
   return (
-    <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-glow overflow-hidden">
+    <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shadow-glow overflow-hidden">
       {/* Header */}
-      <div className="p-5 border-b border-gray-800 space-y-4 overflow-y-auto custom-scroll">
+      <div className="p-5 border-b border-gray-200 dark:border-gray-800 space-y-4 overflow-y-auto custom-scroll">
 
         
         {/* Stats */}
@@ -117,8 +117,8 @@ const Sidebar = ({
           onClick={() => !isProcessing && fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-2xl p-6 mt-2 text-center cursor-pointer transition-all duration-300 
             ${isProcessing 
-              ? "border-gray-700 bg-gray-900/60 cursor-not-allowed" 
-              : "border-gray-700 hover:border-purple-500 hover:bg-gray-800/60"
+              ? "border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900/60 cursor-not-allowed" 
+              : "border-gray-300 dark:border-gray-700 hover:border-purple-500 hover:bg-gray-100 dark:hover:bg-gray-800/60"
             }`}
         >
           <input
@@ -135,15 +135,15 @@ const Sidebar = ({
             </div>
           
             <div>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {isProcessing ? "Processing file..." : "Upload or drag a PDF file"}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Supported format: TXT, MD, DOC, DOCX, PDF
               </p>
 
               {/* Description below box */}
-              <p className="text-sm text-slate-500 mt-6 leading-relaxed text-center">
+              <p className="text-sm text-gray-600 dark:text-slate-500 mt-6 leading-relaxed text-center">
                 Upload your documents to start asking questions. The AI will analyze the content
                 and provide relevant answers.
               </p>
@@ -155,15 +155,15 @@ const Sidebar = ({
         {isProcessing && uploadProgress.stage && (
           <div className="mt-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400 flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                 {uploadProgress.percentage < 100 ? (
                   <Loader className="w-3 h-3 animate-spin" />
                 ) : null}
                 {uploadProgress.stage}
               </span>
-              <span className="text-xs text-gray-500">{uploadProgress.percentage}%</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{uploadProgress.percentage}%</span>
             </div>
-            <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
               <div 
                 className="progress-bar-fill h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300 ease-out"
                 style={{ width: `${uploadProgress.percentage}%` }}
@@ -173,8 +173,8 @@ const Sidebar = ({
         )}
 
         {/* Document List */}
-        <div className="mt-5 border-t border-gray-800 pt-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">My Documents</h3>
+        <div className="mt-5 border-t border-gray-200 dark:border-gray-800 pt-4">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">My Documents</h3>
           <DocumentList
             documents={documents}
             selectedId={selectedId}

@@ -13,9 +13,26 @@
   --color-accent2: #2563eb; /* Blue */
 }
 
+/* Light theme variables */
+:root:not(.dark) {
+  --color-bg: #f9fafb;
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+  --color-text: #1f2937;
+  --color-subtext: #6b7280;
+}
+
 
 body {
   @apply bg-gray-950 text-gray-100 font-sans antialiased selection:bg-purple-600/30 selection:text-white;
+}
+
+.dark body {
+  @apply bg-gray-950 text-gray-100;
+}
+
+body:not(.dark body) {
+  @apply bg-gray-50 text-gray-900;
 }
 
 h1, h2, h3, h4 {
@@ -84,15 +101,15 @@ p {
 
 
 .sidebar-card {
-  @apply bg-gray-800 rounded-xl text-center p-3;
+  @apply bg-white dark:bg-gray-800 rounded-xl text-center p-3 border border-gray-200 dark:border-gray-700;
 }
 
 .sidebar-card h4 {
-  @apply text-gray-400 text-xs uppercase tracking-wider;
+  @apply text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wider;
 }
 
 .sidebar-card .value {
-  @apply text-2xl font-bold text-purple-400;
+  @apply text-2xl font-bold text-purple-600 dark:text-purple-400;
 }
 
 

@@ -134,10 +134,10 @@ const App = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
       <Navbar />
 
-      <div className="flex flex-1 overflow-hidden bg-gray-950 text-white">
+      <div className="flex flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white">
         <Sidebar
           stats={stats}
           onUpload={handleFileUpload} // ✅ fixed name
