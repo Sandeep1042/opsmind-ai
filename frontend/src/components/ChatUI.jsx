@@ -1,44 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Loader, Brain, FileText } from "lucide-react";
+import { Send, Loader, Brain, Bot, User, FileText, AlertCircle } from "lucide-react";
 import api, { getChatHistory, saveMessage, clearChat } from "../api/apiClient";
 
-const sessionId = "opsmind-default-session"; // later replaced with user-specific id (after auth)
+const sessionId = "opsmind-default-session";
 
-// Small delay helper (controls typing speed)
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-
-const ChatUI = ({ stats, setStats, uploadNotification }) => {
+const ChatUI = ({ stats, setStats, systemMessage, setSystemMessage }) => {
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
-  const [shake, setShake] = useState(false);
   const messagesEndRef = useRef(null);
-  const prevNotificationRef = useRef(null);
 
-  // Handle upload completion notification
   useEffect(() => {
-    // Only show notification when uploadNotification changes from false/null to true
-    if (uploadNotification && uploadNotification !== prevNotificationRef.current) {
-      const notificationMsg = {
-        role: "system",
-        type: "upload-success",
-        content: "Document uploaded. Please ask relevant questions.",
-      };
-      setMessages((prev) => [...prev, notificationMsg]);
-      // Persist notification (optional)
-      saveMessage({ sessionId, ...notificationMsg }).catch(() => {});
-      prevNotificationRef.current = uploadNotification;
-    }
-  }, [uploadNotification]);
-
-  // Load chat history on mount
-  useEffect(() => {
-      (async () => {
-        try {
-          const res = await getChatHistory(sessionId);
-          const data = res.data;
-        // Defensive check: make sure we always set an array
+    (async () => {
+      try {
+        const res = await getChatHistory(sessionId);
+        const data = res.data;
         if (Array.isArray(data)) {
           setMessages(data);
         } else if (data && Array.isArray(data.messages)) {
@@ -46,260 +22,329 @@ const ChatUI = ({ stats, setStats, uploadNotification }) => {
         } else {
           setMessages([]);
         }
-      } catch (err) {
-        console.error("⚠️ Failed to load chat history:", err);
-        setMessages([]); // fallback to empty chat
+      } catch {
+        setMessages([]);
       }
     })();
   }, []);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Handler: if user focuses/clicks input but no docs uploaded, show shake + AI message
-  const handleInputInteraction = (e) => {
-    const docs = (stats && typeof stats.totalDocs !== 'undefined') ? stats.totalDocs : 0;
-    if (docs === 0) {
-      // prevent focus
-      try { e.target.blur(); } catch (err) {}
-
-      // animate
-      setShake(true);
-      setTimeout(() => setShake(false), 650);
-
-      // avoid duplicate message
-      setMessages((prev) => {
-        const assistantMsg = { role: 'assistant', content: 'Please upload a document first', warning: true };
-        // persist message (best-effort)
-        saveMessage({ sessionId, ...assistantMsg }).catch(() => {});
-        return [...prev, assistantMsg];
-      });
+  useEffect(() => {
+    if (systemMessage) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "system",
+          type: systemMessage.type,
+          content: systemMessage.content,
+          timestamp: new Date(),
+        },
+      ]);
+      setSystemMessage(null);
     }
-  };
+  }, [systemMessage, setSystemMessage]);
+
+  // helper for simulated typing delay
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleAsk = async () => {
-  if (!query.trim()) return;
+    if (!query.trim()) return;
+    const userMsg = {
+      id: Date.now(),
+      role: "user",
+      content: query,
+      timestamp: new Date(),
+    };
 
-  const userMessage = { role: "user", content: query };
-  setMessages((prev) => [...prev, userMessage]);
-  await saveMessage({ sessionId, ...userMessage });
+    setMessages((prev) => [...prev, userMsg]);
+    setQuery("");
+    setIsAnswering(true);
 
-  setQuery("");
-  setIsAnswering(true);
+    // Temporary "thinking..." message
+    const tempAssistant = {
+      id: `thinking-${Date.now()}`,
+      role: "assistant",
+      content: "Thinking...",
+      thinking: true,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, tempAssistant]);
 
-  // Show temporary assistant message
-  const tempAssistant = { role: "assistant", content: "Thinking...", thinking: true };
-  setMessages((prev) => [...prev, tempAssistant]);
+    try {
+      const res = await api.post("/ask", { query });
+      const { answer, sources } = res.data;
 
-  try {
-    const res = await api.post("/ask", { query });
-    const { answer, sources } = res.data;
+      const normalizeSource = (src, idx) => {
+        if (!src) return { id: idx + 1, source: `Source ${idx + 1}` };
+        if (typeof src === "string") return { id: idx + 1, source: src };
 
-    const fullAnswer = answer || "No response generated.";
-    // Expect sources to be an array of objects: { source, page, lineStart, lineEnd, chunk, match, text }
-    const citations = (sources || []).map((s, idx) => ({ id: idx + 1, ...s }));
+        if (typeof src === "object") {
+          const sourceLabel = [src.source, src.name, src.fileName, src.title]
+            .find((val) => typeof val === "string" && val.trim());
 
-    // Replace "Thinking..." bubble with empty assistant message (without citations initially)
-    setMessages((prev) => {
-      const updated = [...prev];
-      updated.pop(); // remove the temporary thinking message
-      return [...updated, { role: "assistant", content: "" }];
-    });
+          return {
+            id: idx + 1,
+            source: sourceLabel || `Source ${idx + 1}`,
+            page: src.page ?? src.pageNumber ?? src.lineStartPage ?? src.lineStart,
+            chunk: src.chunk ?? src.chunkIndex ?? src.section ?? src.lineEndPage,
+            text: typeof src.text === "string"
+              ? src.text
+              : typeof src.chunk === "string"
+                ? src.chunk
+                : "",
+          };
+        }
 
-    // Token-by-token typing effect
-    const words = fullAnswer.split(" ");
-    for (let i = 0; i < words.length; i++) {
-      await sleep(70); // speed: smaller = faster typing
+        return { id: idx + 1, source: String(src) };
+      };
+
+      const fullAnswer = answer || "No response generated.";
+      const citations = (Array.isArray(sources) ? sources : []).map(normalizeSource);
+
+      // Replace temp with empty assistant message
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated.pop();
+        return [...updated, { role: "assistant", content: "", citations: [], showCitations: false, timestamp: new Date() }];
+      });
+
+      // Typing animation (word-by-word)
+      const words = fullAnswer.split(" ");
+      for (let i = 0; i < words.length; i++) {
+        await sleep(30);
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          lastMsg.content = words.slice(0, i + 1).join(" ");
+          return [...updated];
+        });
+      }
+
+      // Show citations with animation after typing completes
+      await sleep(200);
       setMessages((prev) => {
         const updated = [...prev];
         const lastMsg = updated[updated.length - 1];
-        lastMsg.content = words.slice(0, i + 1).join(" ");
+        lastMsg.citations = citations;
+        lastMsg.showCitations = true;
         return [...updated];
+      });
+
+      await saveMessage({
+        sessionId,
+        role: "assistant",
+        content: fullAnswer,
+        citations,
+      });
+
+      setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
+    } catch (err) {
+      console.error("❌ Chat error:", err.message);
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated.pop();
+        return [
+          ...updated,
+          {
+            role: "assistant",
+            content: "⚠️ Error: Could not get a response.",
+            timestamp: new Date(),
+          },
+        ];
       });
     }
 
-    // Add citations after typing is complete
-    setMessages((prev) => {
-      const updated = [...prev];
-      const lastMsg = updated[updated.length - 1];
-      lastMsg.citations = citations;
-      return [...updated];
-    });
-
-    // Save final completed message
-    await saveMessage({
-      sessionId,
-      role: "assistant",
-      content: fullAnswer,
-      citations,
-    });
-
-    setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
-  } catch (err) {
-    console.error("❌ Chat error:", err.message);
-    setMessages((prev) => {
-      const updated = [...prev];
-      updated.pop(); // remove temporary message
-      return [
-        ...updated,
-        {
-          role: "assistant",
-          content: "⚠️ Error: Could not get a response from AI.",
-        },
-      ];
-    });
-
-  }
-
-  setIsAnswering(false);
+    setIsAnswering(false);
   };
 
-
-
-  const handleClearChat = async () => {
-    try {
-      await clearChat(sessionId);
-      setMessages([]);
-    } catch (err) {
-      console.error("⚠️ Failed to clear chat:", err);
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAsk();
     }
   };
 
+  const toText = (val) => {
+    if (val === null || val === undefined) return "";
+    if (typeof val === "string") return val;
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return String(val);
+    }
+  };
+
+  const formatTime = (val) => {
+    const date = val instanceof Date ? val : new Date(val);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const safeMessages = Array.isArray(messages)
+    ? messages
+    : Array.isArray(messages?.messages)
+      ? messages.messages
+      : [];
+
   return (
-    <div className="flex-1 flex flex-col bg-gray-950 text-white">
-      {/* Chat Header */}
-      <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800 bg-gray-900">
-        <h2 className="text-lg font-semibold text-gray-200">Chat Session</h2>
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-100 dark:bg-gray-900 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white">OpsMind AI — Chat Assistant</h2>
+        </div>
         <button
-          onClick={handleClearChat}
-          className="text-sm text-red-400 hover:text-red-300"
+          onClick={() => clearChat(sessionId) && setMessages([])}
+          className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
         >
           Clear Chat
         </button>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-center">
-            <div>
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 float">
-                <Brain className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-3">Welcome to OpsMind AI</h3>
-              <p className="text-gray-400 mb-6">
-                Upload your documents and ask me anything related to your
-                enterprise SOPs.
-              </p>
-              <div className="space-y-2 text-left max-w-sm mx-auto">
-                <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                  <p className="text-xs text-purple-400 font-semibold mb-1">
-                    Example
-                  </p>
-                  <p className="text-sm text-gray-300">
-                    "Summarize the HR onboarding policy"
-                  </p>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                  <p className="text-xs text-purple-400 font-semibold mb-1">
-                    Example
-                  </p>
-                  <p className="text-sm text-gray-300">
-                    "What’s the escalation process for IT issues?"
-                  </p>
-                </div>
-              </div>
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
+        {safeMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="bg-gradient-to-br from-purple-500 to-blue-500 p-4 rounded-full mb-4">
+              <Brain className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Welcome to OpsMind AI</h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mb-4">
+              Upload your document and ask questions. OpsMind will analyze, summarize, and answer contextually.
+            </p>
+            <div className="mt-4 space-y-2 w-full max-w-md">
+              {["What is this document about?", "Summarize the main points", "Explain key concepts"].map(
+                (example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setQuery(example)}
+                    className="w-full text-left px-4 py-2 bg-gray-200 dark:bg-gray-800/50 hover:bg-gray-300 dark:hover:bg-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition-all"
+                  >
+                    {example}
+                  </button>
+                )
+              )}
             </div>
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <div key={idx} className="flex flex-col space-y-2">
-              {msg.role === "user" && (
-                <div className="chat-bubble chat-user">{msg.content}</div>
-              )}
-              {msg.role === "system" && msg.type === "upload-success" && (
-                <div className="upload-notification-card">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <p className="text-sm text-green-100 font-medium">{msg.content}</p>
+          <>
+            {safeMessages.map((msg, idx) => (
+              <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : msg.role === "system" ? "justify-center" : "flex-row"}`}>
+                {msg.role !== "system" && (
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                      msg.role === "user"
+                        ? "bg-gradient-to-br from-purple-600 to-blue-600"
+                        : "bg-gradient-to-br from-blue-500 to-purple-600"
+                    }`}
+                  >
+                    {msg.role === "user" ? (
+                      <User className="w-4 h-4 text-white" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-white" />
+                    )}
                   </div>
-                </div>
-              )}
-              {msg.role === "assistant" && (
-                <div className={msg.warning ? "chat-bubble border border-red-500 bg-red-900/60 text-red-100" : "chat-bubble chat-assistant"}>
-                  {msg.thinking ? (
-                    <div className="flex items-center gap-3 text-gray-400">
-                      <Loader className="w-5 h-5 animate-spin" /> <span className="typing">Thinking...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <p>
-                          {msg.content}
-                          {isAnswering && idx === messages.length - 1 && (
-                            <span className="typing text-purple-400">█</span>
-                          )}
-                      </p>
+                )}
+                <div
+                  className={`flex-1 max-w-2xl ${
+                    msg.role === "user" ? "items-end" : msg.role === "system" ? "items-center" : "items-start"
+                  } flex flex-col`}
+                >
+                  <div
+                    className={`px-4 py-3 rounded-2xl shadow ${
+                      msg.role === "user"
+                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                        : msg.role === "system" && msg.type === "error"
+                          ? "bg-red-100 dark:bg-red-900/80 border border-red-300 dark:border-red-700 text-red-900 dark:text-red-100"
+                          : "bg-white dark:bg-gray-800 text-black dark:text-gray-100 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    {msg.thinking ? (
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Loader className="w-4 h-4 animate-spin" /> Thinking...
+                      </div>
+                    ) : msg.role === "system" && msg.type === "error" ? (
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <p className="whitespace-pre-wrap">{toText(msg.content)}</p>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{toText(msg.content)}</p>
+                    )}
+                  </div>
 
-                      {msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-3 border-t border-gray-700 pt-2 sources-dropdown">
-                          <p className="text-xs text-gray-400 mb-1 uppercase">
-                            Sources
-                          </p>
-                          {msg.citations.map((c, i) => (
-                            <div key={i} className="mb-3 bg-gray-800 rounded-lg p-3 border border-gray-700">
-                              <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-purple-400" />
-                                  <div className="text-sm text-purple-300 font-semibold">{c.source}</div>
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {c.match !== undefined ? `${(c.match > 1 ? c.match : c.match * 100).toFixed(1)}% match` : ''}
-                                </div>
-                              </div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                Page {c.page ?? '-'} • Line {c.lineStartPage ?? c.lineStart ?? '-'}-{c.lineEndPage ?? c.lineEnd ?? '-'} • Chunk {c.chunk ?? c.chunkIndex ?? '-'}
-                              </div>
-                                {c.text && (
-                                <div className="mt-2 text-sm text-gray-300 italic">{c.text.length > 320 ? c.text.slice(0, 320) + '…' : c.text}</div>
-                              )}
+                  {Array.isArray(msg.citations) && msg.citations.length > 0 && msg.showCitations && (
+                    <div className="mt-3 border-t border-gray-300 dark:border-gray-700 pt-2 space-y-2 sources-dropdown">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Sources</p>
+                      {msg.citations.map((c, i) => {
+                        const sourceLabel = typeof c.source === "string" && c.source.trim()
+                          ? c.source
+                          : typeof c.name === "string" && c.name.trim()
+                            ? c.name
+                            : `Source ${i + 1}`;
+                        const pageLabel = c.page ?? c.pageNumber ?? "-";
+                        const chunkLabel = c.chunk ?? c.chunkIndex ?? "-";
+                        const preview = typeof c.text === "string" ? c.text : "";
+                        return (
+                          <div key={i} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-2 text-xs text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700/60">
+                            <div className="flex items-center gap-2 mb-1">
+                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                              <span className="font-semibold text-gray-900 dark:text-white">{sourceLabel}</span>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                            {preview && (
+                              <p className="text-gray-600 dark:text-gray-400 italic">{preview.length > 160 ? `${preview.slice(0, 160)}…` : preview}</p>
+                            )}
+                            <div className="text-[11px] text-gray-500 dark:text-gray-500 mt-1">
+                              Page {pageLabel} • Chunk {chunkLabel}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {msg.role !== "system" && (
+                    <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">{formatTime(msg.timestamp)}</span>
                   )}
                 </div>
-              )}
-            </div>
-          ))
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Bar */}
-      <div className="bg-gray-900 border-t border-gray-800 p-4">
-        <div className="flex gap-3 max-w-4xl mx-auto">
+      {/* Input Section */}
+      <div className="bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
+        {!stats.totalDocs && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-500 bg-amber-100 dark:bg-amber-900/30 px-3 py-2 rounded-lg">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>Please upload a document before asking questions</span>
+          </div>
+        )}
+        <div className="flex gap-2 max-w-4xl mx-auto">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onClick={handleInputInteraction}
-            placeholder="Ask a question..."
-            className={`input-field ${shake ? 'animate-shake' : ''}`}
-            disabled={isAnswering}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              stats.totalDocs ? "Ask a question about your document..." : "Upload a document first..."
+            }
+            disabled={!stats.totalDocs || isAnswering}
+            className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 border border-gray-300 dark:border-gray-700"
           />
           <button
             onClick={handleAsk}
-            disabled={!query.trim() || isAnswering}
-            className="btn-gradient"
+            disabled={!query.trim() || isAnswering || !stats.totalDocs}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition-all"
           >
-            {isAnswering ? (
-              <Loader className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+            {isAnswering ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            Send
           </button>
         </div>
       </div>
